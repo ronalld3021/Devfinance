@@ -169,3 +169,21 @@ tr:hover {
   margin-top: -20px;
   margin-bottom: 20px;
 }
+button:hover {
+  opacity: 0.8;
+  transform: scale(1.02);
+  transition: 0.2s;
+}
+
+.card {
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+  border-radius: 12px;
+}
+.income {
+  color: #2ecc71;
+}
+
+.expense {
+  color: #e74c3c;
+}
+

@@ -1,42 +1,84 @@
-let lista = document.getElementById("lista");
+const API_URL = "https://devfinance-aywi.onrender.com/transactions";
 
-let transacoes = JSON.parse(localStorage.getItem("transacoes")) || [];
+let transacoes = [];
+let editandoId = null;
 
-window.onload = function () {
+const lista = document.getElementById("lista");
+const botaoAdicionar = document.querySelector("button");
+
+function formatarMoeda(valor) {
+  return valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+async function carregarTransacoes() {
+  const resposta = await fetch(API_URL);
+  transacoes = await resposta.json();
   atualizarTela();
-};
+}
 
-function adicionar() {
-  let descricao = document.getElementById("descricao").value;
-  let valor = Number(document.getElementById("valor").value);
-  let tipo = document.getElementById("tipo").value;
+async function adicionar() {
+  const descricao = document.getElementById("descricao").value;
+  const valor = Number(document.getElementById("valor").value);
+  const tipo = document.getElementById("tipo").value;
 
-  if (descricao === "" || valor <= 0) return;
+  if (descricao === "" || valor <= 0) {
+    alert("Preencha descrição e valor corretamente.");
+    return;
+  }
 
-  let transacao = {
-    id: Date.now(),
-    descricao,
-    valor,
-    tipo,
-    data: new Date().toLocaleDateString("pt-BR")
+  const transacao = {
+    description: descricao,
+    amount: valor,
+    type: tipo,
+    date: new Date().toLocaleDateString("pt-BR"),
   };
 
-  transacoes.push(transacao);
-  salvar();
-  atualizarTela();
+  if (editandoId !== null) {
+    console.log("Editando ID:", editandoId);
+
+    await fetch(`${API_URL}/${editandoId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(transacao),
+    });
+
+    editandoId = null;
+   document.getElementById("btnAdicionar").innerText = "ADICIONAR";
+  } else {
+    await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(transacao),
+    });
+  }
 
   document.getElementById("descricao").value = "";
   document.getElementById("valor").value = "";
+  document.getElementById("tipo").value = "despesa";
+
+  carregarTransacoes();
 }
 
-function remover(id) {
-  transacoes = transacoes.filter(transacao => transacao.id !== id);
-  salvar();
-  atualizarTela();
+async function remover(id) {
+  await fetch(`${API_URL}/${id}`, {
+    method: "DELETE",
+  });
+
+  carregarTransacoes();
 }
 
-function salvar() {
-  localStorage.setItem("transacoes", JSON.stringify(transacoes));
+function editar(id) {
+  const transacao = transacoes.find((item) => item.id === id);
+
+  document.getElementById("descricao").value = transacao.description;
+  document.getElementById("valor").value = transacao.amount;
+  document.getElementById("tipo").value = transacao.type;
+
+  editandoId = id;
+  document.getElementById("btnAdicionar").innerText = "SALVAR ALTERAÇÃO";
 }
 
 function atualizarTela() {
@@ -45,29 +87,37 @@ function atualizarTela() {
   let receitas = 0;
   let despesas = 0;
 
-  transacoes.forEach(transacao => {
-    let tr = document.createElement("tr");
+  transacoes.forEach((transacao) => {
+    const tr = document.createElement("tr");
+
+    const descricao = transacao.description;
+    const valor = Number(transacao.amount);
+    const tipo = transacao.type;
+    const data = transacao.date;
 
     tr.innerHTML = `
-      <td>${transacao.descricao}</td>
-      <td><span class="tag ${transacao.tipo}">${transacao.tipo}</span></td>
-      <td class="${transacao.tipo}">R$ ${transacao.valor.toFixed(2)}</td>
-      <td>${transacao.data || "-"}</td>
+      <td>${descricao}</td>
+      <td><span class="tag ${tipo}">${tipo}</span></td>
+      <td class="${tipo}">${formatarMoeda(valor)}</td>
+      <td>${data}</td>
       <td>
-        <button class="remover" onclick="remover(${transacao.id})">Excluir</button>
+        <button class="editar" onclick="editar(${transacao.id})">EDITAR</button>
+        <button class="remover" onclick="remover(${transacao.id})">EXCLUIR</button>
       </td>
     `;
 
     lista.appendChild(tr);
 
-    if (transacao.tipo === "receita") {
-      receitas += transacao.valor;
+    if (tipo === "receita") {
+      receitas += valor;
     } else {
-      despesas += transacao.valor;
+      despesas += valor;
     }
   });
 
-  document.getElementById("receitas").innerText = `R$ ${receitas.toFixed(2)}`;
-  document.getElementById("despesas").innerText = `R$ ${despesas.toFixed(2)}`;
-  document.getElementById("total").innerText = `R$ ${(receitas - despesas).toFixed(2)}`;
+  document.getElementById("receitas").innerText = formatarMoeda(receitas);
+  document.getElementById("despesas").innerText = formatarMoeda(despesas);
+  document.getElementById("total").innerText = formatarMoeda(receitas - despesas);
 }
+
+carregarTransacoes();
