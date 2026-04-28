@@ -1,4 +1,4 @@
-const API_URL = "https://devfinance-1.onrender.com/transactions";
+const API_URL = "https://devfinance-aywi.onrender.com/transactions";
 
 const token = localStorage.getItem("token");
 

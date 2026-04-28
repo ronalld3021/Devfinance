@@ -21,14 +21,16 @@
   </main>
 
   <script>
-    const API_AUTH = "https://devfinance-1.onrender.com";
+    const API_AUTH = "https://devfinance-aywi.onrender.com";
 
     async function login(event) {
       event.preventDefault();
 
       const res = await fetch(`${API_AUTH}/login`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           email: email.value,
           password: password.value
@@ -41,24 +43,33 @@
         localStorage.setItem("token", data.token);
         window.location.href = "index.html";
       } else {
-        alert("Email ou senha inválidos");
+        alert(data.error || "Email ou senha inválidos");
       }
     }
 
     async function register() {
+      if (!email.value || !password.value) {
+        alert("Digite email e senha");
+        return;
+      }
+
       const res = await fetch(`${API_AUTH}/register`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           email: email.value,
           password: password.value
         })
       });
 
+      const data = await res.json();
+
       if (res.ok) {
         alert("Conta criada com sucesso!");
       } else {
-        alert("Usuário já existe");
+        alert(data.error || "Erro ao criar conta");
       }
     }
   </script>
