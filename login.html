@@ -21,10 +21,12 @@
   </main>
 
   <script>
+    const API_AUTH = "https://devfinance-1.onrender.com";
+
     async function login(event) {
       event.preventDefault();
 
-      const res = await fetch("http://localhost:3333/login", {
+      const res = await fetch(`${API_AUTH}/login`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
@@ -44,7 +46,7 @@
     }
 
     async function register() {
-      const res = await fetch("http://localhost:3333/register", {
+      const res = await fetch(`${API_AUTH}/register`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
