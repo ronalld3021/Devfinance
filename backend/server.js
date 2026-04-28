@@ -1,78 +1,145 @@
 const express = require("express");
 const cors = require("cors");
-const Database = require("better-sqlite3");
+const sqlite3 = require("sqlite3").verbose();
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const db = new sqlite3.Database("database.db");
+
+const SECRET = "segredo_super_secreto";
 
 app.use(cors());
 app.use(express.json());
 
-const db = new Database("database.db");
+// ======================
+// TABELAS
+// ======================
+db.run(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE,
+    password TEXT
+  )
+`);
 
-db.prepare(`
+db.run(`
   CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    description TEXT NOT NULL,
-    amount REAL NOT NULL,
-    type TEXT NOT NULL,
-    date TEXT NOT NULL
+    user_id INTEGER,
+    description TEXT,
+    amount REAL,
+    type TEXT,
+    date TEXT
   )
-`).run();
+`);
 
-app.get("/transactions", (req, res) => {
-  const rows = db
-    .prepare("SELECT * FROM transactions ORDER BY id DESC")
-    .all();
+// ======================
+// REGISTER
+// ======================
+app.post("/register", async (req, res) => {
+  const { email, password } = req.body;
 
-  res.json(rows);
+  const hash = await bcrypt.hash(password, 10);
+
+  db.run(
+    "INSERT INTO users (email, password) VALUES (?, ?)",
+    [email, hash],
+    function (err) {
+      if (err) {
+        return res.status(400).json({ error: "Usuário já existe" });
+      }
+
+      res.json({ message: "Usuário criado" });
+    }
+  );
 });
 
-app.post("/transactions", (req, res) => {
-  const { description, amount, type, date } = req.body;
+// ======================
+// LOGIN
+// ======================
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
 
-  if (!description || !amount || !type || !date) {
-    return res.status(400).json({ error: "Preencha todos os campos" });
+  db.get(
+    "SELECT * FROM users WHERE email = ?",
+    [email],
+    async (err, user) => {
+      if (!user) {
+        return res.status(401).json({ error: "Usuário não encontrado" });
+      }
+
+      const valid = await bcrypt.compare(password, user.password);
+
+      if (!valid) {
+        return res.status(401).json({ error: "Senha inválida" });
+      }
+
+      const token = jwt.sign({ id: user.id }, SECRET, {
+        expiresIn: "1d"
+      });
+
+      res.json({ token });
+    }
+  );
+});
+
+// ======================
+// MIDDLEWARE AUTH
+// ======================
+function auth(req, res, next) {
+  const token = req.headers.authorization;
+
+  if (!token) {
+    return res.status(401).json({ error: "Sem token" });
   }
 
-  const result = db
-    .prepare(
-      "INSERT INTO transactions (description, amount, type, date) VALUES (?, ?, ?, ?)"
-    )
-    .run(description, amount, type, date);
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    req.userId = decoded.id;
+    next();
+  } catch {
+    res.status(401).json({ error: "Token inválido" });
+  }
+}
 
-  res.status(201).json({
-    id: result.lastInsertRowid,
-    description,
-    amount,
-    type,
-    date,
+// ======================
+// GET TRANSAÇÕES
+// ======================
+app.get("/transactions", auth, (req, res) => {
+  db.all(
+    "SELECT * FROM transactions WHERE user_id = ? ORDER BY id DESC",
+    [req.userId],
+    (err, rows) => {
+      res.json(rows);
+    }
+  );
+});
+
+// ======================
+// POST
+// ======================
+app.post("/transactions", auth, (req, res) => {
+  const { description, amount, type, date } = req.body;
+
+  db.run(
+    "INSERT INTO transactions (user_id, description, amount, type, date) VALUES (?, ?, ?, ?, ?)",
+    [req.userId, description, amount, type, date],
+    function () {
+      res.json({ id: this.lastID });
+    }
+  );
+});
+
+// ======================
+// DELETE
+// ======================
+app.delete("/transactions/:id", auth, (req, res) => {
+  db.run("DELETE FROM transactions WHERE id = ?", [req.params.id], () => {
+    res.json({ message: "Deletado" });
   });
 });
 
-app.put("/transactions/:id", (req, res) => {
-  const { id } = req.params;
-  const { description, amount, type, date } = req.body;
-
-  if (!description || !amount || !type || !date) {
-    return res.status(400).json({ error: "Preencha todos os campos" });
-  }
-
-  db.prepare(
-    "UPDATE transactions SET description = ?, amount = ?, type = ?, date = ? WHERE id = ?"
-  ).run(description, amount, type, date, id);
-
-  res.json({ message: "Transação atualizada com sucesso" });
-});
-
-app.delete("/transactions/:id", (req, res) => {
-  const { id } = req.params;
-
-  db.prepare("DELETE FROM transactions WHERE id = ?").run(id);
-
-  res.json({ message: "Transação excluída com sucesso" });
-});
-
-app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
+app.listen(3333, () => {
+  console.log("Servidor rodando em http://localhost:3333");
 });

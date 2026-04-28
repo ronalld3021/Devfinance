@@ -2,12 +2,16 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <h1>DevFinance - Ronald Dev</h1>
+  <title>DevFinance - Ronald Dev</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <main class="container">
+
+    <!-- BOTÃO SAIR -->
+    <button class="logout" onclick="logout()">Sair</button>
+
     <h1>DevFinance</h1>
 
     <div class="resumo">
@@ -36,26 +40,30 @@
         <option value="despesa">Despesa</option>
       </select>
 
-      <button id="btnAdicionar" onclick="adicionar()">ADICIONAR</button>
+      <button type="button" onclick="adicionar()">ADICIONAR</button>
     </div>
 
-  <div id="tabela-container">
-  <table>
-    <thead>
-      <tr>
-        <th>Descrição</th>
-        <th>Tipo</th>
-        <th>Valor</th>
-        <th>Data</th>
-        <th>Ações</th>
-      </tr>
-    </thead>
-    <tbody id="lista"></tbody>
-  </table>
-</div>
+    <!-- GRAFICO -->
+    <canvas id="grafico" style="margin-bottom: 20px;"></canvas>
+
+    <div id="tabela-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+            <th>Data</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista"></tbody>
+      </table>
+    </div>
 
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

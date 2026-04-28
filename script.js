@@ -1,123 +1,176 @@
-const API_URL = "https://devfinance-aywi.onrender.com/transactions";
+const API_URL = "http://localhost:3333/transactions";
+
+const token = localStorage.getItem("token");
+
+if (!token) {
+  window.location.href = "login.html";
+}
 
 let transacoes = [];
-let editandoId = null;
-
-const lista = document.getElementById("lista");
-const botaoAdicionar = document.querySelector("button");
-
-function formatarMoeda(valor) {
-  return valor.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-}
+let grafico;
 
 async function carregarTransacoes() {
-  const resposta = await fetch(API_URL);
-  transacoes = await resposta.json();
-  atualizarTela();
-}
+  const res = await fetch(API_URL, {
+    headers: {
+      Authorization: token
+    }
+  });
 
-async function adicionar() {
-  const descricao = document.getElementById("descricao").value;
-  const valor = Number(document.getElementById("valor").value);
-  const tipo = document.getElementById("tipo").value;
-
-  if (descricao === "" || valor <= 0) {
-    alert("Preencha descrição e valor corretamente.");
+  if (res.status === 401) {
+    logout();
     return;
   }
 
-  const transacao = {
-    description: descricao,
-    amount: valor,
-    type: tipo,
-    date: new Date().toLocaleDateString("pt-BR"),
-  };
-
-  if (editandoId !== null) {
-    console.log("Editando ID:", editandoId);
-
-    await fetch(`${API_URL}/${editandoId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(transacao),
-    });
-
-    editandoId = null;
-   document.getElementById("btnAdicionar").innerText = "ADICIONAR";
-  } else {
-    await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(transacao),
-    });
-  }
-
-  document.getElementById("descricao").value = "";
-  document.getElementById("valor").value = "";
-  document.getElementById("tipo").value = "despesa";
-
-  carregarTransacoes();
+  transacoes = await res.json();
+  atualizarTela();
 }
 
-async function remover(id) {
+window.adicionar = async function () {
+  const descricaoInput = document.getElementById("descricao");
+  const valorInput = document.getElementById("valor");
+  const tipoInput = document.getElementById("tipo");
+
+  const descricao = descricaoInput.value.trim();
+  const valor = valorInput.value;
+  const tipo = tipoInput.value;
+
+  if (!descricao || !valor || Number(valor) <= 0) {
+    alert("Preencha descrição e valor corretamente");
+    return;
+  }
+
+  const data = new Date().toLocaleDateString("pt-BR");
+
+  const res = await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token
+    },
+    body: JSON.stringify({
+      description: descricao,
+      amount: Number(valor),
+      type: tipo,
+      date: data
+    })
+  });
+
+  if (!res.ok) {
+    alert("Erro ao adicionar transação");
+    return;
+  }
+
+  limparCampos();
+  carregarTransacoes();
+};
+
+window.editar = async function (id) {
+  const t = transacoes.find((item) => item.id === id);
+
+  if (!t) return;
+
+  document.getElementById("descricao").value = t.description;
+  document.getElementById("valor").value = t.amount;
+  document.getElementById("tipo").value = t.type;
+
+  await remover(id);
+};
+
+window.remover = async function (id) {
   await fetch(`${API_URL}/${id}`, {
     method: "DELETE",
+    headers: {
+      Authorization: token
+    }
   });
 
   carregarTransacoes();
-}
+};
 
-function editar(id) {
-  const transacao = transacoes.find((item) => item.id === id);
-
-  document.getElementById("descricao").value = transacao.description;
-  document.getElementById("valor").value = transacao.amount;
-  document.getElementById("tipo").value = transacao.type;
-
-  editandoId = id;
-  document.getElementById("btnAdicionar").innerText = "SALVAR ALTERAÇÃO";
-}
+window.logout = function () {
+  localStorage.removeItem("token");
+  window.location.href = "login.html";
+};
 
 function atualizarTela() {
+  const lista = document.getElementById("lista");
+  const receitas = document.getElementById("receitas");
+  const despesas = document.getElementById("despesas");
+  const total = document.getElementById("total");
+
   lista.innerHTML = "";
 
-  let receitas = 0;
-  let despesas = 0;
+  let totalReceitas = 0;
+  let totalDespesas = 0;
 
-  transacoes.forEach((transacao) => {
+  transacoes.forEach((t) => {
+    const valor = Number(t.amount);
+
+    if (t.type === "receita") {
+      totalReceitas += valor;
+    } else {
+      totalDespesas += valor;
+    }
+
     const tr = document.createElement("tr");
 
-    const descricao = transacao.description;
-    const valor = Number(transacao.amount);
-    const tipo = transacao.type;
-    const data = transacao.date;
-
     tr.innerHTML = `
-      <td>${descricao}</td>
-      <td><span class="tag ${tipo}">${tipo}</span></td>
-      <td class="${tipo}">${formatarMoeda(valor)}</td>
-      <td>${data}</td>
+      <td>${t.description}</td>
+      <td><span class="tag ${t.type}">${t.type}</span></td>
+      <td>${formatarMoeda(valor)}</td>
+      <td>${t.date}</td>
       <td>
-        <button class="editar" onclick="editar(${transacao.id})">EDITAR</button>
-        <button class="remover" onclick="remover(${transacao.id})">EXCLUIR</button>
+        <button onclick="editar(${t.id})">EDITAR</button>
+        <button onclick="remover(${t.id})">EXCLUIR</button>
       </td>
     `;
 
     lista.appendChild(tr);
-
-    if (tipo === "receita") {
-      receitas += valor;
-    } else {
-      despesas += valor;
-    }
   });
 
-  document.getElementById("receitas").innerText = formatarMoeda(receitas);
-  document.getElementById("despesas").innerText = formatarMoeda(despesas);
-  document.getElementById("total").innerText = formatarMoeda(receitas - despesas);
+  receitas.innerText = formatarMoeda(totalReceitas);
+  despesas.innerText = formatarMoeda(totalDespesas);
+  total.innerText = formatarMoeda(totalReceitas - totalDespesas);
+
+  atualizarGrafico(totalReceitas, totalDespesas);
+}
+
+function atualizarGrafico(receitas, despesas) {
+  const canvas = document.getElementById("grafico");
+
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+
+  if (grafico) {
+    grafico.destroy();
+  }
+
+  grafico = new Chart(ctx, {
+    type: "pie",
+    data: {
+      labels: ["Receitas", "Despesas"],
+      datasets: [
+        {
+          data: [receitas, despesas],
+          backgroundColor: ["#22c55e", "#ef4444"]
+        }
+      ]
+    }
+  });
+}
+
+function formatarMoeda(valor) {
+  return valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+}
+
+function limparCampos() {
+  document.getElementById("descricao").value = "";
+  document.getElementById("valor").value = "";
+  document.getElementById("tipo").value = "receita";
 }
 
 carregarTransacoes();
